@@ -110,30 +110,54 @@ class ApiService {
     }
   }
 
+  // Send location data to API
   Future<Map<String, dynamic>> sendLocationToApi(
       double latitude, double longitude) async {
     try {
+      // Retrieve the token and user ID from SharedPreferences
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String token = prefs.getString('token') ?? '';
+      int userId = prefs.getInt('user_id') ?? 0;
+
+      if (token.isEmpty || userId == 0) {
+        return {'error': 'User not authenticated'};
+      }
+
+      String userAgent = Platform.isAndroid
+          ? 'Android ${Platform.version}'
+          : 'iOS ${Platform.operatingSystemVersion}';
+
+      // Create the request data
+      Map<String, dynamic> requestData = {
+        'user_id': userId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'user_agent': userAgent,
+      };
+
+      // Make the API request
       final response = await http.post(
-        Uri.parse('$baseUrl/location'),
+        Uri.parse('$baseUrl/locations'), // API URL
         headers: {
           'Content-Type': 'application/json',
+          'Authorization':
+              'Bearer $token', // Include the Bearer token for authentication
         },
-        body: jsonEncode({
-          'latitude': latitude.toString(),
-          'longitude': longitude.toString(),
-        }),
+        body: json.encode(requestData), // Pass the request data
       );
 
+      // Handle the response
       if (response.statusCode == 200) {
         print('Location sent successfully: ${response.body}');
         return {'success': true, 'message': 'Location successfully saved!'};
       } else {
-        return {
-          'error': 'Failed to send location but success saved in database'
-        };
+        print('Failed to send location. Status code: ${response.statusCode}');
+        print('Response body: ${response.body}');
+        return {'error': 'Failed to send location. Please try again later.'};
       }
     } catch (e) {
-      return {'error': e.toString()};
+      print('Exception while sending location: $e');
+      return {'error': 'Failed to send location. Please try again later.'};
     }
   }
 
